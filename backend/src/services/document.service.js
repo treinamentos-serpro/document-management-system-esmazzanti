@@ -25,45 +25,35 @@ class DocumentService {
     return owner;
   }
 
-  async uploadDocument({ file, owner }) {
-    try {
-      this.validateOwner(owner);
-    } catch (err) {
-      if (file && file.filename) {
-        await this.documentRepository.deleteFile(file.filename);
-      }
-      throw err;
-    }
-
+  validateFile(file) {
     if (!file) {
       throw new InvalidRequestError('Nenhum arquivo enviado.');
     }
 
     if (file.size === 0) {
-      if (file.filename) {
-        await this.documentRepository.deleteFile(file.filename);
-      }
       throw new InvalidRequestError('O arquivo enviado está vazio.');
     }
 
     if (config.allowedMimeTypes && file.mimetype) {
       const isAllowed = config.allowedMimeTypes.includes(file.mimetype.toLowerCase());
       if (!isAllowed) {
-        if (file.filename) {
-          await this.documentRepository.deleteFile(file.filename);
-        }
         throw new InvalidRequestError('Tipo de arquivo não permitido.');
       }
     }
 
     if (file.size > config.maxFileSize) {
-      if (file.filename) {
-        await this.documentRepository.deleteFile(file.filename);
-      }
       throw new FileTooLargeError('O arquivo excede o tamanho máximo permitido.');
     }
+  }
 
-    const doc = {
+  async removeUploadedFile(file) {
+    if (file && file.filename) {
+      await this.documentRepository.deleteFile(file.filename);
+    }
+  }
+
+  createDocument(file, owner) {
+    return {
       id: crypto.randomUUID(),
       originalName: file.originalname || 'documento',
       storedName: file.filename,
@@ -72,13 +62,23 @@ class DocumentService {
       uploadedAt: new Date().toISOString(),
       owner,
     };
+  }
+
+  async uploadDocument({ file, owner }) {
+    try {
+      this.validateOwner(owner);
+      this.validateFile(file);
+    } catch (err) {
+      await this.removeUploadedFile(file);
+      throw err;
+    }
+
+    const doc = this.createDocument(file, owner);
 
     try {
       this.documentRepository.save(doc);
     } catch (err) {
-      if (file.filename) {
-        await this.documentRepository.deleteFile(file.filename);
-      }
+      await this.removeUploadedFile(file);
       throw new InternalError('Falha ao registrar o documento.');
     }
 
