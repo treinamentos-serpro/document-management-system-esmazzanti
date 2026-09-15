@@ -11,17 +11,25 @@
 // usando multer com diskStorage. Não utilize provedores externos.
 
 const express = require('express');
+const config = require('./config');
+const documentRoutes = require('./routes/document.routes');
+const errorHandler = require('./middlewares/error.middleware');
 
 const app = express();
-const PORT = process.env.PORT || 3000;
+const PORT = config.port;
 
 app.use(express.json());
 
-// Endpoint de verificação de saúde. As demais rotas (/upload, /documents,
-// /documents/:id/download) serão implementadas durante o Passo 2.
+// Endpoint de verificação de saúde.
 app.get('/health', (req, res) => {
   res.json({ status: 'ok' });
 });
+
+// Rotas de documentos do DMS
+app.use(documentRoutes);
+
+// Middleware centralizado de tratamento de erros
+app.use(errorHandler);
 
 if (require.main === module) {
   app.listen(PORT, () => {
